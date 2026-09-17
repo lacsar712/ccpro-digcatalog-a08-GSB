@@ -23,6 +23,11 @@ func date(s string) *time.Time {
 	return &t
 }
 
+func dt(s string) *time.Time {
+	t, _ := time.ParseInLocation("2006-01-02 15:04", s, time.Local)
+	return &t
+}
+
 func Run(db *gorm.DB) {
 	var count int64
 	db.Model(&models.User{}).Count(&count)
@@ -105,6 +110,33 @@ func Run(db *gorm.DB) {
 	}
 	for i := range finds {
 		db.Create(&finds[i])
+	}
+
+	// 探方摄影台账：T1（二里头）4 条，其中 1 条关联文物 EL-2024-0001
+	photoLogs := []models.PhotoLog{
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-0001", ShotAt: dt("2024-03-12 09:20"),
+			Direction: "由北向南", Subject: "T1 探方全景，第②层灰褐文化层揭露后",
+			LinkedFindID: &finds[0].ID, FileRef: "photos/erlitsou/T1/T1-0001.jpg",
+		},
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-0002", ShotAt: dt("2024-03-12 10:05"),
+			Direction: "由南向北", Subject: "第②层陶片出土状态特写",
+			FileRef: "photos/erlitsou/T1/T1-0002.jpg",
+		},
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-0003", ShotAt: dt("2024-03-15 14:40"),
+			Direction: "垂直俯拍", Subject: "青铜爵足残段提取前原位记录",
+			FileRef: "https://example.org/digcatalog/photos/T1-0003.jpg",
+		},
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-0004", ShotAt: dt("2024-03-15 16:10"),
+			Direction: "由东向西", Subject: "T1 东壁剖面地层关系",
+			FileRef: "photos/erlitsou/T1/T1-0004.jpg",
+		},
+	}
+	for i := range photoLogs {
+		db.Create(&photoLogs[i])
 	}
 
 	log.Println("seed data inserted")

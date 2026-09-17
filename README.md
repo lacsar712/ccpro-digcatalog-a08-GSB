@@ -43,14 +43,17 @@ docker compose up --build
 | `admin` | `123456` | 管理员 |
 | `recorder` | `123456` | 记录员 |
 
+首次启动自动写入示例数据：3 个工地、4 个探方、6 件文物，以及二里头 T1 探方的 4 条摄影台账（其中 `T1-0001` 关联登记号 `EL-2024-0001`）。
+
 ## 功能模块
 
 1. **登录认证** — 管理员 / 记录员角色，JWT 鉴权
 2. **发掘工地 Site** — 名称、时代、经纬度、负责人
 3. **探方/发掘单位 Unit** — 所属工地、编号、深度区间、地层简述
 4. **出土文物 Find** — 所属探方、登记号、器物类型、材质、完整度、出土日期、描述、存放位置
-5. **材质分类 Material** — 名称、描述（字典表）
-6. **概览页** — 工地数、探方数、文物总数、按器物类型统计
+5. **摄影台账 PhotoLog** — 所属探方、照片编号（同探方唯一，冲突返回 409）、拍摄时间、方向、拍摄对象、可空关联登记号（须同探方）、文件引用（路径或外链，不实际存储大文件）；支持按探方与拍摄日期筛选，探方列表可一键跳入
+6. **材质分类 Material** — 名称、描述（字典表）
+7. **概览页** — 工地数、探方数、文物总数、按器物类型统计
 
 ## API 前缀
 
@@ -60,6 +63,7 @@ docker compose up --build
 - `GET|POST|PUT|DELETE /api/sites`
 - `GET|POST|PUT|DELETE /api/units`
 - `GET|POST|PUT|DELETE /api/finds`
+- `GET|POST|PUT|DELETE /api/photologs`（支持 `?unitId=`、`?date=YYYY-MM-DD`、`?dateFrom=&dateTo=` 筛选；照片编号同探方重复返回 409）
 - `GET|POST|PUT|DELETE /api/materials`
 - `GET /api/overview`
 

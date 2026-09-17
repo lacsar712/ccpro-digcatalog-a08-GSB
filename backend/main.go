@@ -45,6 +45,7 @@ func main() {
 		&models.Unit{},
 		&models.Material{},
 		&models.Find{},
+		&models.PhotoLog{},
 	); err != nil {
 		log.Fatalf("auto migrate failed: %v", err)
 	}
@@ -86,6 +87,12 @@ func main() {
 			auth.POST("/finds", h.CreateFind)
 			auth.PUT("/finds/:id", h.UpdateFind)
 			auth.DELETE("/finds/:id", h.DeleteFind)
+
+			auth.GET("/photologs", h.ListPhotoLogs)
+			auth.GET("/photologs/:id", h.GetPhotoLog)
+			auth.POST("/photologs", h.CreatePhotoLog)
+			auth.PUT("/photologs/:id", h.UpdatePhotoLog)
+			auth.DELETE("/photologs/:id", h.DeletePhotoLog)
 		}
 	}
 

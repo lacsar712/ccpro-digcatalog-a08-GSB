@@ -33,6 +33,7 @@
             <td>{{ item.depthMin }} ~ {{ item.depthMax }}</td>
             <td>{{ item.stratumDesc || '-' }}</td>
             <td>
+              <button class="btn secondary small" @click="goPhotoLogs(item)">台账</button>
               <button class="btn secondary small" @click="openEdit(item)">编辑</button>
               <button class="btn danger small" @click="remove(item)">删除</button>
             </td>
@@ -83,7 +84,10 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '../api/http'
+
+const router = useRouter()
 
 const list = ref([])
 const sites = ref([])
@@ -163,6 +167,10 @@ async function save() {
   } catch (e) {
     formError.value = e.response?.data?.error || '保存失败'
   }
+}
+
+function goPhotoLogs(item) {
+  router.push({ name: 'photologs', query: { unitId: item.id } })
 }
 
 async function remove(item) {

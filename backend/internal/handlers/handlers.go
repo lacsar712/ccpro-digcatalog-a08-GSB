@@ -225,6 +225,11 @@ func (h *Handler) DeleteUnit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "该探方下仍有文物，无法删除"})
 		return
 	}
+	h.DB.Model(&models.PhotoLog{}).Where("unit_id = ?", id).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "该探方下仍有摄影台账，无法删除"})
+		return
+	}
 	if err := h.DB.Delete(&models.Unit{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -403,7 +408,171 @@ func (h *Handler) UpdateFind(c *gin.Context) {
 
 func (h *Handler) DeleteFind(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
+	// 清空摄影台账对该文物的关联，避免悬空引用
+	h.DB.Model(&models.PhotoLog{}).Where("linked_find_id = ?", id).Update("linked_find_id", nil)
 	if err := h.DB.Delete(&models.Find{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "已删除"})
+}
+
+// ---------- PhotoLogs ----------
+
+type photoLogReq struct {
+	UnitID       uint    `json:"unitId"`
+	PhotoNo      string  `json:"photoNo"`
+	ShotAt       *string `json:"shotAt"`
+	Direction    string  `json:"direction"`
+	Subject      string  `json:"subject"`
+	LinkedFindID *uint   `json:"linkedFindId"`
+	FileRef      string  `json:"fileRef"`
+}
+
+// parseShotAt 兼容 datetime-local(2006-01-02T15:04)、日期与 RFC3339 格式
+func parseShotAt(s *string) *time.Time {
+	if s == nil || *s == "" {
+		return nil
+	}
+	layouts := []string{"2006-01-02T15:04", "2006-01-02T15:04:05", "2006-01-02 15:04:05", "2006-01-02", time.RFC3339}
+	for _, layout := range layouts {
+		if t, err := time.ParseInLocation(layout, *s, time.Local); err == nil {
+			return &t
+		}
+	}
+	return nil
+}
+
+// validatePhotoLog 校验探方存在、关联文物存在且属于同一探方
+func (h *Handler) validatePhotoLog(c *gin.Context, req *photoLogReq) bool {
+	if req.UnitID == 0 || req.PhotoNo == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "探方和照片编号必填"})
+		return false
+	}
+	var unit models.Unit
+	if err := h.DB.First(&unit, req.UnitID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "所属探方不存在"})
+		return false
+	}
+	if req.LinkedFindID != nil {
+		var find models.Find
+		if err := h.DB.First(&find, *req.LinkedFindID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "关联的文物登记号不存在"})
+			return false
+		}
+		if find.UnitID != req.UnitID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "关联文物必须属于同一探方"})
+			return false
+		}
+	}
+	return true
+}
+
+// photoNoConflict 检查同探方下照片编号是否已被占用（excludeID 用于更新时排除自身）
+func (h *Handler) photoNoConflict(unitID uint, photoNo string, excludeID uint) bool {
+	var count int64
+	h.DB.Model(&models.PhotoLog{}).
+		Where("unit_id = ? AND photo_no = ? AND id <> ?", unitID, photoNo, excludeID).
+		Count(&count)
+	return count > 0
+}
+
+func (h *Handler) ListPhotoLogs(c *gin.Context) {
+	var logs []models.PhotoLog
+	q := h.DB.Preload("Unit").Preload("Unit.Site").Preload("LinkedFind").Order("shot_at desc, id desc")
+	if unitID := c.Query("unitId"); unitID != "" {
+		q = q.Where("unit_id = ?", unitID)
+	}
+	if date := c.Query("date"); date != "" {
+		q = q.Where("DATE(shot_at) = ?", date)
+	}
+	if from := c.Query("dateFrom"); from != "" {
+		q = q.Where("shot_at >= ?", from+" 00:00:00")
+	}
+	if to := c.Query("dateTo"); to != "" {
+		q = q.Where("shot_at <= ?", to+" 23:59:59")
+	}
+	if err := q.Find(&logs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, logs)
+}
+
+func (h *Handler) GetPhotoLog(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var log models.PhotoLog
+	if err := h.DB.Preload("Unit").Preload("LinkedFind").First(&log, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "摄影台账不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, log)
+}
+
+func (h *Handler) applyPhotoLogReq(log *models.PhotoLog, req *photoLogReq) {
+	log.UnitID = req.UnitID
+	log.PhotoNo = req.PhotoNo
+	log.ShotAt = parseShotAt(req.ShotAt)
+	log.Direction = req.Direction
+	log.Subject = req.Subject
+	log.LinkedFindID = req.LinkedFindID
+	log.FileRef = req.FileRef
+}
+
+func (h *Handler) CreatePhotoLog(c *gin.Context) {
+	var req photoLogReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数无效"})
+		return
+	}
+	if !h.validatePhotoLog(c, &req) {
+		return
+	}
+	if h.photoNoConflict(req.UnitID, req.PhotoNo, 0) {
+		c.JSON(http.StatusConflict, gin.H{"error": "该探方下照片编号已存在"})
+		return
+	}
+	var log models.PhotoLog
+	h.applyPhotoLogReq(&log, &req)
+	if err := h.DB.Create(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.DB.Preload("Unit").Preload("LinkedFind").First(&log, log.ID)
+	c.JSON(http.StatusCreated, log)
+}
+
+func (h *Handler) UpdatePhotoLog(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var log models.PhotoLog
+	if err := h.DB.First(&log, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "摄影台账不存在"})
+		return
+	}
+	var req photoLogReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数无效"})
+		return
+	}
+	if !h.validatePhotoLog(c, &req) {
+		return
+	}
+	if h.photoNoConflict(req.UnitID, req.PhotoNo, log.ID) {
+		c.JSON(http.StatusConflict, gin.H{"error": "该探方下照片编号已存在"})
+		return
+	}
+	h.applyPhotoLogReq(&log, &req)
+	if err := h.DB.Save(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.DB.Preload("Unit").Preload("LinkedFind").First(&log, log.ID)
+	c.JSON(http.StatusOK, log)
+}
+
+func (h *Handler) DeletePhotoLog(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	if err := h.DB.Delete(&models.PhotoLog{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
