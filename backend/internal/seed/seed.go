@@ -107,5 +107,32 @@ func Run(db *gorm.DB) {
 		db.Create(&finds[i])
 	}
 
+	photoLogs := []models.PhotoLog{
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-20240312-001", ShotAt: date("2024-03-12"),
+			Direction: "由北向南", Subject: "T1 第②层灰褐文化层揭露全景",
+			FileRef: "photos/2024/erlituo/T1/DSC_0001.jpg",
+		},
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-20240312-002", ShotAt: date("2024-03-12"),
+			Direction: "由东向西", Subject: "T1 东壁剖面地层关系",
+			FileRef: "photos/2024/erlituo/T1/DSC_0002.jpg",
+		},
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-20240315-001", ShotAt: date("2024-03-15"),
+			Direction: "垂直俯拍", Subject: "泥质灰陶口沿残片出土状态",
+			LinkedFindID: &finds[0].ID,
+			FileRef:     "photos/2024/erlituo/T1/DSC_0035.jpg",
+		},
+		{
+			UnitID: units[0].ID, PhotoNo: "T1-20240318-001", ShotAt: date("2024-03-18"),
+			Direction: "由南向北", Subject: "T1 清理完成后全景",
+			FileRef: "https://example.org/digcatalog/photos/T1-20240318-001.jpg",
+		},
+	}
+	for i := range photoLogs {
+		db.Create(&photoLogs[i])
+	}
+
 	log.Println("seed data inserted")
 }

@@ -1,6 +1,6 @@
 # 考古发掘出土文物编目系统（DigCatalog）
 
-面向考古工地出土文物登记与编目的全栈演示项目：支持发掘工地、探方/发掘单位、出土文物、材质字典的 CRUD，以及概览统计。
+面向考古工地出土文物登记与编目的全栈演示项目：支持发掘工地、探方/发掘单位、探方摄影台账、出土文物、材质字典的 CRUD，以及概览统计。
 
 ## 技术栈
 
@@ -48,9 +48,10 @@ docker compose up --build
 1. **登录认证** — 管理员 / 记录员角色，JWT 鉴权
 2. **发掘工地 Site** — 名称、时代、经纬度、负责人
 3. **探方/发掘单位 Unit** — 所属工地、编号、深度区间、地层简述
-4. **出土文物 Find** — 所属探方、登记号、器物类型、材质、完整度、出土日期、描述、存放位置
-5. **材质分类 Material** — 名称、描述（字典表）
-6. **概览页** — 工地数、探方数、文物总数、按器物类型统计
+4. **探方摄影台账 PhotoLog** — 所属探方、照片编号（同探方唯一，冲突返回 409）、拍摄日期、拍摄方向、拍摄内容、可选关联登记号（须同探方）、文件引用（路径或外链，不存大文件）；支持按探方与拍摄日期筛选，可从探方列表直接跳入
+5. **出土文物 Find** — 所属探方、登记号、器物类型、材质、完整度、出土日期、描述、存放位置
+6. **材质分类 Material** — 名称、描述（字典表）
+7. **概览页** — 工地数、探方数、文物总数、按器物类型统计
 
 ## API 前缀
 
@@ -59,6 +60,7 @@ docker compose up --build
 - `POST /api/auth/login`
 - `GET|POST|PUT|DELETE /api/sites`
 - `GET|POST|PUT|DELETE /api/units`
+- `GET|POST|PUT|DELETE /api/photologs`（列表支持 `?unitId=` 与 `?date=YYYY-MM-DD` 筛选）
 - `GET|POST|PUT|DELETE /api/finds`
 - `GET|POST|PUT|DELETE /api/materials`
 - `GET /api/overview`

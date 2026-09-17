@@ -52,6 +52,22 @@ type Material struct {
 	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
+type PhotoLog struct {
+	ID           uint           `json:"id" gorm:"primaryKey"`
+	UnitID       uint           `json:"unitId" gorm:"not null;index;uniqueIndex:idx_unit_photo"`
+	PhotoNo      string         `json:"photoNo" gorm:"size:64;not null;uniqueIndex:idx_unit_photo"` // 同探方内唯一
+	ShotAt       *time.Time     `json:"shotAt" gorm:"type:date"`
+	Direction    string         `json:"direction" gorm:"size:64"`   // 拍摄方向,如 由北向南
+	Subject      string         `json:"subject" gorm:"size:255"`    // 拍摄内容
+	LinkedFindID *uint          `json:"linkedFindId" gorm:"index"`  // 可空,且须与本台账同探方
+	FileRef      string         `json:"fileRef" gorm:"size:512"`    // 文本路径或外链,不存大文件
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`
+	Unit         *Unit          `json:"unit,omitempty" gorm:"foreignKey:UnitID"`
+	LinkedFind   *Find          `json:"linkedFind,omitempty" gorm:"foreignKey:LinkedFindID"`
+}
+
 type Find struct {
 	ID           uint           `json:"id" gorm:"primaryKey"`
 	UnitID       uint           `json:"unitId" gorm:"not null;index"`
